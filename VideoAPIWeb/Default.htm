@@ -1,0 +1,264 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Demonstrates using the Skillsoft Restful API for embedding Video</title>
+    <link rel="stylesheet" href="//releases.flowplayer.org/7.2.7/skin/skin.css">
+    <style>
+        .flowplayer {
+            background-color: #333;
+            width: 800px;
+            height: 450px;
+        }
+
+            /* override cursor: col-resize */
+            .flowplayer .fp-buffer,
+            .flowplayer .fp-progress {
+                cursor: default;
+            }
+            /* disabled timeline progress bar color */
+            .flowplayer .fp-progress {
+                background-color: #999;
+            }
+
+        .success {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+
+        .warn {
+            color: orange;
+        }
+    </style>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/log4javascript/1.4.9/log4javascript.min.js"></script>
+    <script>
+        var logger = log4javascript.getLogger();
+        var appender = new log4javascript.InPageAppender();
+        appender.setHeight("300px");
+        logger.addAppender(appender);
+    </script>
+</head>
+<body>
+
+    <div id="player" class="flowplayer"></div>
+
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.min.js"></script>
+
+    <!-- HLS.JS library to suport HLS playback in FlowPlayer-->
+    <script src="//cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- Flowplayer library -->
+    <script src="//releases.flowplayer.org/7.2.7/flowplayer.min.js"></script>
+    <!-- Flowplayer hlsjs engine (light) -->
+    <script src="//releases.flowplayer.org/hlsjs/flowplayer.hlsjs.min.js"></script>
+
+    <!-- Skillsoft Jquery Plugin for calling the Video Restful API-->
+    <!-- Need to load Jquery and crypto-js before this -->
+    <script src="js/jquery.skillsoft.videorapi.js"></script>
+    <script>
+        $(function () {
+            $("#player").hide();
+
+            function log(message, msgClass) {
+                switch (msgClass) {
+                    case 'trace':
+                        logger.trace(message);
+                        break;
+                    case 'debug':
+                        logger.debug(message);
+                        break;
+                    case 'success':
+                        logger.info(message);
+                        break;
+                    case 'warn':
+                        logger.warn(message);
+                        break;
+                    case 'error':
+                        logger.error(message);
+                        break;
+                    case 'fatal':
+                        logger.fatal(message);
+                        break;
+                }
+            };
+
+            function error(message) {
+                log(message, "error");
+            }
+
+            function success(message) {
+                log(message, "success");
+            }
+
+            function debug(message) {
+                log(message, "debug");
+            }
+
+            function warn(message) {
+                log(message, "warn");
+            }
+
+            success("Starting Test");
+
+            //Setup the Skillsoft RAPI plugin
+            // hostname = the skillport site
+            // HashkeyProxy = page that will return the key to use in the rest of the RAPI calls, we use server side code here so as to keep the SharedSecret value secure.
+            var rapi = skillsoft.videorapi(
+                {
+                    hostname: "{customername}.skillport.com",
+                    HashkeyProxy: "/getrapikey"
+                });
+
+            //Setup the user info
+            // username = user account on Skillport site that has to exist already, and has a valid password set (i.e. does not require a new password to be set)
+            // videoId = id of video to use in test that is available on the site and assigned to the user
+            var rapiInfo = {
+                username: 'videotest',
+                videoId: '69079'
+            };
+
+            debug("Rapi Module Version=" + rapi.getVersion());
+
+            //Call Login
+            rapi.login(rapiInfo.username)
+                .done(function (data, textStatus, jqXHR) {
+                    $.extend(rapiInfo, data);
+                    debug("Rapi Login. Token: " + rapiInfo.rapiToken);
+                })
+                .fail(function (jqXHR, textStatus, errorThrown, errorId, errorObj) {
+                    error("Rapi Login Error.");
+                    if (errorId > 0) {
+                        error("Rapi Specific Error Details. "+ JSON.stringify(errorObj));
+                    }
+                    if (errorThrown == "NetworkError") {
+
+                    } else {
+
+                    }
+                })
+                .then(function (data, textStatus, jqXHR) {
+                    //If login successful then get details for the video
+                    rapi.videoDetails(rapiInfo.rapiToken, rapiInfo.videoId)
+                        .done(function (data, textStatus, jqXHR) {
+                            debug("videoDetails response: " + JSON.stringify(data));
+
+                            $.extend(rapiInfo, data);
+                            success("Video Title: " + rapiInfo.videoSummary.title);
+                        })
+                        .fail(function (jqXHR, textStatus, errorThrown, errorId, errorObj) {
+                            error("Rapi Details Error");
+                            if (errorId > 0) {
+                                error("Rapi Specific Error Details. " + JSON.stringify(errorObj));
+                            }
+                            if (errorThrown == "NetworkError") {
+
+                            } else {
+
+                            }
+                        })
+                        .then(function (data, textStatus, jqXHR) {
+                            //If details successful then get locations for the video - two locations HLS and MP4
+                            rapi.videoContentLocation(rapiInfo.rapiToken, rapiInfo.videoId)
+                                .done(function (data, textStatus, jqXHR) {
+
+                                    debug("videoContentLocation response: " + JSON.stringify(data, null, 2));
+
+                                    //With returned video data setup flowplayer, the config here
+                                    //uses HLS streams on browser that support it such as Chrome, Edge or with HLSJS support
+                                    //uses MP4 stream on browsers that dont support HLS such as IE11 on Windows 7
+                                    $.extend(rapiInfo, data);
+                                    $("#player").show();
+                                    var videoArray = [];
+                                    var subtitlesArray = [];
+
+                                    if ("hls" in data) {
+                                        if (data.hls[0] != null) {
+                                            debug("Rapi Location. HLS: " + rapiInfo.hls[0].url);
+                                            videoArray.push({ type: "application/x-mpegurl", src: data.hls[0].url });
+                                        }
+                                    } else {
+                                        warn("Rapi Location. HLS: No Value Returned");
+                                    }
+
+                                    if ("mp4" in data) {
+                                        if (data.mp4[0] != null) {
+                                            debug("Rapi Location. MP4: " + rapiInfo.mp4[0].url);
+                                            videoArray.push({ type: "video/mp4", src: data.mp4[0].url });
+                                        }
+                                    } else {
+                                        warn("Rapi Location. HLS: No Value Returned");
+                                    }
+
+                                    var sources = { sources: videoArray };
+
+                                    //Note subtitle data for NON HLS streams planned for next release.
+                                    if ("subtitle" in data) // correct
+                                    {
+                                        if (data.subtitle[0] != null) {
+											debug("Rapi Location. SUBTITLE: " +  data.subtitle[0].url);
+                                            subtitlesArray.push({ "default": true, kind: "subtitles", src: data.subtitle[0].url });
+                                            sources.subtitles = subtitlesArray;
+                                        }
+                                    } else {
+                                        warn("Rapi Location. subttitle: No Value Returned");
+                                    }
+
+
+
+                                    var conf = {
+                                        // player level
+                                        clip: sources,
+                                        //Disable flash HLS playback in FlowPlayer
+                                        swfHls: false,
+                                        hlsjs: {
+                                            subtitles: true,
+                                            listeners: ['hlsManifestParsed', 'hlsLevelSwitch'],
+                                        }
+                                    }
+
+                                    var fpapi = flowplayer("#player", conf);
+                                    fpapi.on("error", function (e, api, error) {
+                                        api.error = api.loading = false;
+                                    });
+
+                                    fpapi.on('load ready', function (e, api, video) {
+                                        success("Video Loaded. Format: " + video.type + " Source: " + video.src);
+                                    });
+
+                                    fpapi.on('hlsManifestParsed', function (e, api, data) {
+                                        rapiInfo.manifest = data;
+                                        debug("hlsManifestParsed Event. Data: " + JSON.stringify(data, null, 2));
+                                    });
+
+                                    fpapi.on('hlsLevelSwitch', function (e, api, data) {
+                                        if ("manifest" in rapiInfo) {
+                                            debug("hlsLevelSwitch Event. HLS Level: " + data.level + " BitRate: " + rapiInfo.manifest.levels[data.level].bitrate + " URL: " + rapiInfo.manifest.levels[data.level].url);
+                                        } else {
+                                            //Manifest not parsed yet so default level
+                                            debug("hlsLevelSwitch Event (Default Level). HLS Level: " + data.level + " BitRate: " + data.bitrate + " URL: " + data.url);
+                                        }
+                                    });
+                                    fpapi.load({ sources: videoArray });
+
+                                })
+                                .fail(function (jqXHR, textStatus, errorThrown, errorId, errorObj) {
+                                    error("Rapi Location Error.");
+                                    if (errorId > 0) {
+                                        error("Rapi Specific Error Details. " + JSON.stringify(errorObj));
+                                    }
+                                    if (errorThrown == "NetworkError") {
+
+                                    } else {
+
+                                    }
+                                });
+                        });
+                });
+        });
+    </script>
+</body>
+</html>
