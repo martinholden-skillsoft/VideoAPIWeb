@@ -69,8 +69,9 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Default.htm" />
-    <Content Include="js\jquery.skillsoft.videorapi.js" />
-    <Content Include="js\jquery.skillsoft.videorapi.min.js" />
+    <Content Include="gulpfile.js" />
+    <Content Include="js\vendor\jquery.skillsoft.videorapi\jquery.skillsoft.videorapi.js" />
+    <Content Include="js\vendor\jquery.skillsoft.videorapi\jquery.skillsoft.videorapi.min.js" />
     <Content Include="Web.config">
       <SubType>Designer</SubType>
     </Content>
@@ -83,6 +84,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="package.json" />
     <None Include="packages.config" />
     <None Include="Web.Debug.config">
       <DependentUpon>Web.config</DependentUpon>

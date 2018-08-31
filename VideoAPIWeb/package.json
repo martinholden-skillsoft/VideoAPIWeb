@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "name": "asp.net",
+  "private": true,
+  "devDependencies": {
+    "gulp": "3.9.1",
+    "gulp-concat": "2.6.1",
+    "gulp-rimraf": "0.2.2",
+    "rimraf": "2.6.2",
+    "merge-stream": "^1.0.1",
+    "jquery.skillsoft.videorapi": "git+https://git@github.com/martinholden-skillsoft/jquery.skillsoft.videorapi.git"
+  }
+, "-vs-binding":{"ProjectOpened":["install"]}
+}
